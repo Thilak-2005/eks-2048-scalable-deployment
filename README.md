@@ -1,4 +1,4 @@
-# 🚀 Amazon EKS Project with Fargate, Ingress & ALB Controller  
+# Amazon EKS Project with Fargate, Ingress & ALB Controller  
 
 This project demonstrates the setup of an **Amazon EKS Cluster** with **Fargate profiles**, **Ingress Controller (ALB Controller)**, and **OIDC integration** for secure IAM role-based access.  
 
@@ -8,14 +8,14 @@ We create an EKS cluster using `eksctl`. This automatically provisions VPC, subn
 ```bash
 eksctl create cluster --name my-cluster --region us-east-1 --fargate
 ```
-![sfd](screenshots/your-image.png)
+![](clustercreation.png)
 
 
 ## Step 2: Create a Fargate Profile
 
 Fargate allows us to run pods without managing EC2 nodes. Create a profile for specific namespaces.
 
-![sfd](screenshots/your-image.png)
+![](fargate.png)
 
 
 ## Step 3: Configure Identity Provider (OIDC)
@@ -41,4 +41,10 @@ Link the IAM role with Kubernetes Service Account for pod-level access.
 
 Now install the AWS Load Balancer (ALB) Controller via Helm. This will manage Ingress resources and create an ALB automatically.
 
-![sfd](screenshots/your-image.png)
+![](loadbalancer.png)
+
+
+![](loadbalancer2.png)
+
+
+![](alboutput.png)
