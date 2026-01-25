@@ -23,6 +23,7 @@ Fargate allows us to run pods without managing EC2 nodes. Create a profile for s
 Enable OIDC identity provider to integrate IAM roles with Kubernetes service accounts.
 
 ![](helmloadbalancer.jpeg)
+![](kubernetescluster.jpeg)
 
 
 ## Step 4: Create IAM Policy and Role
@@ -35,7 +36,7 @@ Create an IAM policy for ALB Controller and attach it to the service account.
 
 Link the IAM role with Kubernetes Service Account for pod-level access.
 
-![](igressout.jpegp)
+![](igressout.jpeg)
 
 ## Step 6: Install the ALB Ingress Controller
 
