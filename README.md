@@ -23,6 +23,7 @@ Fargate allows us to run pods without managing EC2 nodes. Create a profile for s
 Enable OIDC identity provider to integrate IAM roles with Kubernetes service accounts.
 
 ![](helmloadbalancer.jpeg)
+
 ![](kubernetescluster.jpeg)
 
 
