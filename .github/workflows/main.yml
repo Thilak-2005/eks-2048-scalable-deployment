@@ -1,0 +1,249 @@
+name: spotgenius-sgadmin-frontendvue3
+ 
+
+on:
+
+  push:
+
+    branches:
+
+      - dev
+
+      - qa
+
+      - stage2
+
+      # prod is intentionally excluded from auto-triggers
+
+  workflow_dispatch:
+
+    inputs:
+
+      environment:
+
+        description: "Select environment"
+
+        required: true
+
+        default: "dev"
+
+        type: choice
+
+        options:
+
+          - dev
+
+          - qa
+
+          - stage
+
+          - prod
+
+ 
+
+permissions:
+
+  id-token: write
+
+  contents: read
+
+ 
+
+jobs:
+
+  # STAGE 1: Display Deployment Environment
+
+  display-environment:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Determine Environment Name
+
+        run: |
+
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+
+            # Handle manual triggers (stage is already stage in the dropdown)
+
+            ENV=${{ github.event.inputs.environment }}
+
+            IS_MANUAL="True"
+
+          else
+
+            IS_MANUAL="False"
+
+            # Handle automatic triggers (translate stage2 branch to stage environment)
+
+            case "${{ github.ref_name }}" in
+
+              dev) ENV=dev ;;
+
+              qa) ENV=qa ;;
+
+              stage2) ENV=stage ;;
+
+              prod) ENV=prod ;;
+
+              *) ENV=dev ;;
+
+            esac
+
+          fi
+
+          echo "ENV_NAME=$ENV" >> $GITHUB_ENV
+
+          echo "IS_MANUAL=$IS_MANUAL" >> $GITHUB_ENV
+
+ 
+
+      - name: Show Environment
+
+        run: |
+
+          echo "#########################"
+
+          echo " Deploying to: ${{ env.ENV_NAME }}"
+
+          echo " Branch: ${{ github.ref_name }}"
+
+          echo " Manual Run: ${{ env.IS_MANUAL }}"
+
+          echo "#########################"
+
+ 
+
+  # STAGE 2: Build App & Publish Artifact 
+
+  build:
+
+    needs: display-environment
+
+    runs-on: ubuntu-latest
+
+    # Dynamically target the correct GitHub Environment Variable Group
+
+    environment: ${{ github.event_name == 'workflow_dispatch' && format('spotgenius-{0}-sgadmin-frontendvue3-variables', github.event.inputs.environment) || (github.ref_name == 'dev' && 'spotgenius-dev-sgadmin-frontendvue3-variables') || (github.ref_name == 'qa' && 'spotgenius-qa-sgadmin-frontendvue3-variables') || (github.ref_name == 'stage2' && 'spotgenius-stage-sgadmin-frontendvue3-variables') || (github.ref_name == 'prod' && 'spotgenius-prod-sgadmin-frontendvue3-variables') || 'spotgenius-dev-sgadmin-frontendvue3-variables' }}
+
+    steps:
+
+      - name: Checkout Repository
+
+        uses: actions/checkout@v4
+
+ 
+
+      - name: Install Node.js
+
+        uses: actions/setup-node@v4
+
+        with:
+
+          node-version: '20' # Updated to Node 20.x based on your ADO pipeline
+
+ 
+
+      - name: Dynamically Load Frontend Variables
+
+        env:
+
+          ALL_VARS: ${{ toJSON(vars) }}
+
+        run: |
+
+          echo "Injecting all VUE_APP_ and VITE_ variables from GitHub Environment..."
+
+          echo "$ALL_VARS" | jq -r 'to_entries[] | select(.key | startswith("VUE_APP_") or startswith("VITE_")) | "\(.key)=\(.value)"' >> $GITHUB_ENV
+
+ 
+
+      - name: npm install and build
+
+        run: |
+
+          npm install
+
+          npm run build
+
+        env:
+
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+          # Only your secret token needs to be explicitly listed here!
+
+          SG_CONNECT_PACKAGE_TOKEN: ${{ vars.SG_CONNECT_PACKAGE_TOKEN }}
+
+ 
+
+      - name: Publish Vue build as pipeline artifact
+
+        uses: actions/upload-artifact@v4
+
+        with:
+
+          name: dist
+
+          path: dist/
+
+          retention-days: 1
+
+ 
+ 
+
+  # STAGE 3: Deploy to AWS S3
+
+ 
+
+  deploy:
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    # Reload environment to pause for UI approval rules and load AWS variables
+
+    environment: ${{ github.event_name == 'workflow_dispatch' && format('spotgenius-{0}-sgadmin-frontendvue3-variables', github.event.inputs.environment) || (github.ref_name == 'dev' && 'spotgenius-dev-sgadmin-frontendvue3-variables') || (github.ref_name == 'qa' && 'spotgenius-qa-sgadmin-frontendvue3-variables') || (github.ref_name == 'stage2' && 'spotgenius-stage-sgadmin-frontendvue3-variables') || (github.ref_name == 'prod' && 'spotgenius-prod-sgadmin-frontendvue3-variables') || 'spotgenius-dev-sgadmin-frontendvue3-variables' }}
+
+    steps:
+
+      - name: Download Vue build artifact
+
+        uses: actions/download-artifact@v4
+
+        with:
+
+          name: dist
+
+          path: dist/
+
+ 
+
+      - name: Configure AWS Credentials
+
+        uses: aws-actions/configure-aws-credentials@v4
+
+        with:
+
+          aws-region: ${{ vars.AWS_REGION }}
+
+          role-to-assume: ${{ vars.AWS_SERVICE_CONNECTION }}
+
+ 
+
+      - name: Sync dist/ to S3 (clean upload)
+
+        run: |
+
+          echo "Uploading to s3://${{ vars.S3_BUCKET_NAME }}/${{ vars.S3_UPLOAD_PATH }}"
+
+          aws s3 sync dist/ "s3://${{ vars.S3_BUCKET_NAME }}/${{ vars.S3_UPLOAD_PATH }}" \
+
+            --delete \
+
+            --cache-control "no-cache"
+
+ 
+ 
+ 
